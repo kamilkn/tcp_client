@@ -1,10 +1,15 @@
 use log::{error, info};
-use sha2::Digest;
 use simple_logger::SimpleLogger;
 use std::error::Error;
-use std::time::Instant;
+
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+
+mod utils {
+  pub mod sha2_256;
+}
+use utils::sha2_256::solve_challenge;
+
 
 #[tokio::main]
 async fn main() {
@@ -35,40 +40,3 @@ async fn read_string_from_stream(stream: &mut TcpStream) -> Result<String, Box<d
     Ok(String::from_utf8_lossy(&buf[..n]).to_string())
 }
 
-fn solve_challenge(challenge: &str) -> Result<String, Box<dyn Error>> {
-    let parts: Vec<&str> = challenge.split(':').collect();
-    let random_string = parts.get(0).ok_or("Invalid challenge format")?;
-    let required_zeros = parts.get(1).ok_or("Invalid challenge format")?.as_bytes();
-    let mut nonce = 0;
-
-    let start_time = Instant::now();
-
-    loop {
-        let attempt = format!("{}{}", random_string, nonce);
-        let hash = sha2::Sha256::digest(attempt.as_bytes());
-
-        if nonce % 100_000 == 0 {
-            info!("Current nonce: {}, Hash: {:?}", nonce, hash);
-        }
-        if hash.starts_with(required_zeros) {
-            let duration = start_time.elapsed();
-            info!("Nonce: {}, Time: {:?}", nonce, duration);
-            return Ok(nonce.to_string());
-        }
-        nonce += 1;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_solve_challenge() {
-        let challenge = "random_string:0";
-        match solve_challenge(&challenge) {
-            Ok(nonce) => assert!(nonce.len() > 0), // Проверьте, что nonce не пустой
-            Err(e) => panic!("Ошибка: {:?}", e),   // Паника в случае ошибки
-        }
-    }
-}
