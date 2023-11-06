@@ -44,13 +44,14 @@ fn solve_challenge(challenge: &str) -> Result<String, Box<dyn Error>> {
     loop {
         let attempt = format!("{}{}", random_string, nonce);
         let hash = sha2::Sha256::digest(attempt.as_bytes());
+
+        if nonce % 100_000 == 0 {
+          info!("Current nonce: {}, Hash: {:?}", nonce, hash);
+        }
         if hash.starts_with(required_zeros) {
             let duration = start_time.elapsed();
-            info!("Time: {:?}", duration);
+            info!("Nonce: {}, Time: {:?}", nonce, duration);
             return Ok(nonce.to_string());
-        }
-        if nonce % 100_000 == 0 {
-            info!("Current nonce: {}, Hash: {:?}", nonce, hash);
         }
         nonce += 1;
     }
