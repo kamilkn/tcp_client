@@ -18,20 +18,22 @@ async fn main() {
 
 async fn run() -> Result<(), Box<dyn Error>> {
     let mut stream = TcpStream::connect("127.0.0.1:8084").await?;
-    let mut buf = [0; 1024];
-    let n = stream.read(&mut buf).await?;
-    let challenge = String::from_utf8_lossy(&buf[..n]).to_string();
+    let challenge = read_string_from_stream(&mut stream).await?;
     info!("Received challenge: {}", challenge);
-    let nonce = solve_challenge(&challenge)?;
 
+    let nonce = solve_challenge(&challenge)?;
     stream.write_all(nonce.as_bytes()).await?;
-    let n = stream.read(&mut buf).await?;
-    let quote = String::from_utf8_lossy(&buf[..n]).to_string();
+
+    let quote = read_string_from_stream(&mut stream).await?;
     info!("Received quote: {}", quote);
     Ok(())
 }
 
-
+async fn read_string_from_stream(stream: &mut TcpStream) -> Result<String, Box<dyn Error>> {
+    let mut buf = [0; 1024];
+    let n = stream.read(&mut buf).await?;
+    Ok(String::from_utf8_lossy(&buf[..n]).to_string())
+}
 
 fn solve_challenge(challenge: &str) -> Result<String, Box<dyn Error>> {
     let parts: Vec<&str> = challenge.split(':').collect();
@@ -46,7 +48,7 @@ fn solve_challenge(challenge: &str) -> Result<String, Box<dyn Error>> {
         let hash = sha2::Sha256::digest(attempt.as_bytes());
 
         if nonce % 100_000 == 0 {
-          info!("Current nonce: {}, Hash: {:?}", nonce, hash);
+            info!("Current nonce: {}, Hash: {:?}", nonce, hash);
         }
         if hash.starts_with(required_zeros) {
             let duration = start_time.elapsed();
@@ -65,9 +67,8 @@ mod tests {
     fn test_solve_challenge() {
         let challenge = "random_string:0";
         match solve_challenge(&challenge) {
-            Ok(nonce) => assert!(nonce.len() > 0),  // Проверьте, что nonce не пустой
-            Err(e) => panic!("Ошибка: {:?}", e),  // Паника в случае ошибки
+            Ok(nonce) => assert!(nonce.len() > 0), // Проверьте, что nonce не пустой
+            Err(e) => panic!("Ошибка: {:?}", e),   // Паника в случае ошибки
         }
     }
 }
-
